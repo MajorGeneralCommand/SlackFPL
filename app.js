@@ -8,7 +8,7 @@ const client = new WebClient(process.env.SLACK_BOT_TOKEN);
 const CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
 const LEAGUE_ID = 2295537;
 
-const STATE_FILE = path.join(process.cwd(), 'state.json');
+const STATE_FILE = path.join(__dirname, 'state.json');
 
 function loadState() {
   try {
@@ -56,18 +56,6 @@ function formatSeason(results) {
   return message;
 }
 
-function getLatestCompletedEvent(events, { requireDataChecked = true } = {}) {
-  const now = Date.now();
-  const completed = events
-    .filter(e =>
-      e.finished === true &&
-      new Date(e.deadline_time).getTime() <= now &&
-      (!requireDataChecked || e.data_checked === true)
-    )
-    .sort((a, b) => a.id - b.id);
-  return completed[completed.length - 1] || null;
-}
-
 async function postGWAndSeason(gwId, results) {
   const gwMessage = formatGW(results);
   const seasonMessage = formatSeason(results);
@@ -82,13 +70,16 @@ async function postGWAndSeason(gwId, results) {
 async function checkAndPost() {
   const state = loadState();
   const data = await fetchEvents();
-  const latest = getLatestCompletedEvent(data.events, { requireDataChecked: true });
-  if (!latest) return;
-  if (state.lastPostedGW === latest.id) return;
-
+  const currentFinished = data.events.find(e =>
+    e.is_current === true &&
+    e.finished === true &&
+    e.data_checked === true
+  );
+  if (!currentFinished) return;
+  if (state.lastPostedGW === currentFinished.id) return;
   const league = await fetchLeague();
-  await postGWAndSeason(latest.id, league.standings.results);
-  state.lastPostedGW = latest.id;
+  await postGWAndSeason(currentFinished.id, league.standings.results);
+  state.lastPostedGW = currentFinished.id;
   saveState(state);
 }
 
