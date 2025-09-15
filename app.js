@@ -14,7 +14,7 @@ function loadState() {
   try {
     return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
   } catch {
-    return { lastPostedGW: null };
+    return { lastPostedGW: null, lastDeadlineNotified: null };
   }
 }
 
@@ -56,31 +56,61 @@ function formatSeason(results) {
   return message;
 }
 
+function formatDeadlineReminder(event) {
+  const deadline = new Date(event.deadline_time);
+  const deadlineStr = deadline.toLocaleString('en-GB', {
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Europe/London'
+  });
+  return `⏰ Husk: *GW${event.id}* er mindre enn 24 timer unna!\n\n🗓️ Deadline: *${deadlineStr}* (Britisk tid)`;
+}
+
 async function postGWAndSeason(gwId, results) {
   const gwMessage = formatGW(results);
   const seasonMessage = formatSeason(results);
-
   await client.chat.postMessage({ channel: CHANNEL_ID, text: gwMessage, blocks: [{ type: 'section', text: { type: 'mrkdwn', text: gwMessage } }] });
   await client.chat.postMessage({ channel: CHANNEL_ID, text: '────────────────────────────', blocks: [{ type: 'section', text: { type: 'plain_text', text: ' ' } }] });
   await client.chat.postMessage({ channel: CHANNEL_ID, text: seasonMessage, blocks: [{ type: 'section', text: { type: 'mrkdwn', text: seasonMessage } }] });
-
   console.log(`Posted GW${gwId} + season standings`);
 }
 
 async function checkAndPost() {
   const state = loadState();
   const data = await fetchEvents();
+
   const currentFinished = data.events.find(e =>
     e.is_current === true &&
     e.finished === true &&
     e.data_checked === true
   );
-  if (!currentFinished) return;
-  if (state.lastPostedGW === currentFinished.id) return;
-  const league = await fetchLeague();
-  await postGWAndSeason(currentFinished.id, league.standings.results);
-  state.lastPostedGW = currentFinished.id;
-  saveState(state);
+
+  if (currentFinished && state.lastPostedGW !== currentFinished.id) {
+    const league = await fetchLeague();
+    await postGWAndSeason(currentFinished.id, league.standings.results);
+    state.lastPostedGW = currentFinished.id;
+    saveState(state);
+  }
+
+  const nextEvent = data.events.find(e => e.is_next === true);
+  if (nextEvent) {
+    const deadline = new Date(nextEvent.deadline_time);
+    const now = new Date();
+    const diffHours = (deadline - now) / (1000 * 60 * 60);
+    if (diffHours > 0 && diffHours <= 24 && state.lastDeadlineNotified !== nextEvent.id) {
+      const message = formatDeadlineReminder(nextEvent);
+      await client.chat.postMessage({
+        channel: CHANNEL_ID,
+        text: message,
+        blocks: [{ type: 'section', text: { type: 'mrkdwn', text: message } }]
+      });
+      state.lastDeadlineNotified = nextEvent.id;
+      saveState(state);
+      console.log(`Posted deadline reminder for GW${nextEvent.id}`);
+    }
+  }
 }
 
 cron.schedule('0 * * * *', checkAndPost);
