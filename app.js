@@ -3,10 +3,10 @@ const { WebClient } = require('@slack/web-api');
 const cron = require('node-cron');
 
 const client = new WebClient(process.env.SLACK_BOT_TOKEN);
-const CHANNEL_ID = process.env.SLACK_LOG_CHANNEL_ID;
+const CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
 const LEAGUE_ID = 2295537;
 
-let lastPostedGW = null; // persist this to a file/DB if your process restarts
+let lastPostedGW = null;
 
 async function fetchEvents() {
   const res = await fetch('https://fantasy.premierleague.com/api/bootstrap-static/');
@@ -20,7 +20,6 @@ async function fetchLeague() {
   return res.json();
 }
 
-// ---- your existing formatters (reuse your versions) ----
 function formatGW(results) {
   const sorted = [...results].sort((a, b) => b.event_total - a.event_total);
   const TOP_N = 5;
@@ -42,7 +41,6 @@ function formatSeason(results) {
   });
   return message;
 }
-// --------------------------------------------------------
 
 function getLatestCompletedEvent(events, { requireDataChecked = true } = {}) {
   const now = Date.now();
