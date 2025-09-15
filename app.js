@@ -1,12 +1,26 @@
 require('dotenv').config();
 const { WebClient } = require('@slack/web-api');
 const cron = require('node-cron');
+const fs = require('fs');
+const path = require('path');
 
 const client = new WebClient(process.env.SLACK_BOT_TOKEN);
 const CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
 const LEAGUE_ID = 2295537;
 
-let lastPostedGW = null;
+const STATE_FILE = path.join(process.cwd(), 'state.json');
+
+function loadState() {
+  try {
+    return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+  } catch {
+    return { lastPostedGW: null };
+  }
+}
+
+function saveState(state) {
+  fs.writeFileSync(STATE_FILE, JSON.stringify(state), 'utf8');
+}
 
 async function fetchEvents() {
   const res = await fetch('https://fantasy.premierleague.com/api/bootstrap-static/');
@@ -66,17 +80,16 @@ async function postGWAndSeason(gwId, results) {
 }
 
 async function checkAndPost() {
-  const data = await fetchEvents();              // { events: [...] }
+  const state = loadState();
+  const data = await fetchEvents();
   const latest = getLatestCompletedEvent(data.events, { requireDataChecked: true });
   if (!latest) return;
+  if (state.lastPostedGW === latest.id) return;
 
-  if (lastPostedGW === latest.id) return;        // already posted this GW
-
-  const league = await fetchLeague();            // standings for message content
+  const league = await fetchLeague();
   await postGWAndSeason(latest.id, league.standings.results);
-  lastPostedGW = latest.id;
+  state.lastPostedGW = latest.id;
+  saveState(state);
 }
 
-// Run once at startup, then schedule (hourly here; adjust as you like)
-checkAndPost().catch(console.error);
 cron.schedule('0 * * * *', checkAndPost);
