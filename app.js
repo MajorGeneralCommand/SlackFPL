@@ -65,7 +65,7 @@ function formatDeadlineReminder(event) {
     hour12: false,
     timeZone: 'Europe/London'
   });
-  return `⏰ Husk: *GW${event.id}* er mindre enn 24 timer unna!\n\n🗓️ Deadline: *${deadlineStr}* (Britisk tid)`;
+  return `⏰ Husk: *GW${event.id}* er mindre enn 24 timer unna!\n\n🗓️ Deadline: *${deadlineStr}* (Britisk tid) @channel`;
 }
 
 async function postGWAndSeason(gwId, results) {
