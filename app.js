@@ -58,14 +58,14 @@ function formatSeason(results) {
 
 function formatDeadlineReminder(event) {
   const deadline = new Date(event.deadline_time);
-  const deadlineStr = deadline.toLocaleString('en-GB', {
+  const deadlineStr = deadline.toLocaleString('no-NO', {
     weekday: 'long',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-    timeZone: 'Europe/London'
+    timeZone: 'Europe/Oslo'
   });
-  return `⏰ Husk: *GW${event.id}* er mindre enn 24 timer unna!\n\n🗓️ Deadline: *${deadlineStr}* (Britisk tid) @channel`;
+  return `⏰ Husk: *GW${event.id}* er mindre enn 24 timer unna!\n\n🗓️ Deadline: *${deadlineStr}* @channel`;
 }
 
 async function postGWAndSeason(gwId, results) {
